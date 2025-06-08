@@ -4,7 +4,8 @@ import lombok.Data;
 
 @Data
 public class RegisterRequest {
-    private String username;
-    private String email;
+    private String email;         // Có thể null nếu dùng phone
+    private String phoneNumber;   // Có thể null nếu dùng email
     private String password;
+    private String fullName;      // Optional
 }
