@@ -1,33 +1,124 @@
 package com.mm.mimo.service.implService;
 
+import com.mm.mimo.entity.Role;
 import com.mm.mimo.entity.User;
+import com.mm.mimo.enums.RoleEnum;
 import com.mm.mimo.payload.request.LoginRequest;
 import com.mm.mimo.payload.request.OAuthLoginRequest;
 import com.mm.mimo.payload.request.RegisterRequest;
-import com.mm.mimo.repo.OauthAccountRepository;
+import com.mm.mimo.payload.respone.JwtResponse;
+import com.mm.mimo.payload.respone.UserResponse;
+import com.mm.mimo.repo.RoleRepository;
 import com.mm.mimo.repo.UserRepository;
-import com.mm.mimo.service.interfaceService.AuthSevice;
+import com.mm.mimo.security.JwtUtil;
+import com.mm.mimo.security.UserPrinciple;
+import com.mm.mimo.service.interfaceService.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-public class AuthServiceImpl implements AuthSevice {
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+public class AuthServiceImpl implements AuthService {
+
     @Autowired
     private UserRepository userRepository;
 
     @Autowired
-    private OauthAccountRepository oauthAccountRepository;
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     @Override
-    public User register(RegisterRequest request) {
-        return null;
+    @Transactional
+    public UserResponse register(RegisterRequest request) {
+        // Kiểm tra xem username, email, hoặc sđt đã tồn tại chưa
+        if (userRepository.existsByEmailOrUsernameOrPhoneNumber(request.getEmail(), request.getUsername(), request.getPhoneNumber())) {
+            throw new IllegalArgumentException("Lỗi: Email, Username hoặc Số điện thoại đã được sử dụng!");
+        }
+
+        // Tìm vai trò mặc định là ROLE_USER
+        Role userRole = roleRepository.findByName(RoleEnum.ROLE_USER)
+                .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy vai trò ROLE_USER."));
+
+        // Tạo người dùng mới
+        User user = User.builder()
+                .username(request.getUsername())
+                .email(request.getEmail())
+                .phoneNumber(request.getPhoneNumber())
+                .fullName(request.getFullName())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .isLocked(false)
+                .roles(Set.of(userRole))
+                .build();
+
+        User savedUser = userRepository.save(user);
+
+        // Chuyển đổi sang UserResponse để trả về
+        return UserResponse.builder()
+                .userId(savedUser.getId())
+                .email(savedUser.getEmail())
+                .phoneNumber(savedUser.getPhoneNumber())
+                .fullName(savedUser.getFullName())
+                .avatarUrl(savedUser.getAvatarUrl())
+                .build();
     }
 
     @Override
-    public User login(LoginRequest request) {
-        return null;
+    public JwtResponse login(LoginRequest request) {
+        // Thực hiện xác thực
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getUsernameOrEmailOrPhone(),
+                        request.getPassword()
+                )
+        );
+
+        // Nếu xác thực thành công, đặt vào SecurityContext
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // Lấy thông tin người dùng đã xác thực
+        UserPrinciple userPrinciple = (UserPrinciple) authentication.getPrincipal();
+
+        // Tạo token JWT
+        String jwt = jwtUtil.generateToken(Map.of("userId", userPrinciple.getId()), userPrinciple);
+
+        // Lấy danh sách vai trò
+        List<String> roles = userPrinciple.getAuthorities().stream()
+                .map(item -> item.getAuthority())
+                .collect(Collectors.toList());
+
+        // Trả về JwtResponse
+        return new JwtResponse(
+                jwt,
+                userPrinciple.getId(),
+                userPrinciple.getUsername(),
+                userPrinciple.getEmail(), // Cần lấy email từ UserPrinciple (cần thêm vào)
+                roles
+        );
     }
 
     @Override
-    public User loginWithOAuth(OAuthLoginRequest request) {
-        return null;
+    public JwtResponse loginWithOAuth(OAuthLoginRequest request) {
+        // Logic cho đăng nhập OAuth2 sẽ được triển khai ở đây.
+        // Cần kiểm tra OauthAccountRepository, nếu chưa có thì tạo user mới hoặc liên kết.
+        // Hiện tại trả về null để hoàn thiện sau.
+        throw new UnsupportedOperationException("Chức năng đăng nhập OAuth2 chưa được triển khai.");
     }
 }

@@ -2,12 +2,15 @@ package com.mm.mimo.payload.respone;
 
 import lombok.Builder;
 import lombok.Data;
+import java.util.UUID;
 
 @Data
 @Builder
 public class UserResponse {
-    private Long userId;
-    private String username;
+    private UUID userId;
     private String email;
-    private String role;
+    private String phoneNumber;
+    private String fullName;
+    private String avatarUrl;
+    private boolean isLocked;
 }
