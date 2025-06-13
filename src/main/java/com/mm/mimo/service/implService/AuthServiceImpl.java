@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -82,7 +83,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public JwtResponse login(LoginRequest request) {
-        // Thực hiện xác thực
+        // AuthenticationManager sẽ tự động sử dụng UserDetailsServiceImpl của bạn
+        // để tìm người dùng bằng username, email, hoặc số điện thoại.
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getUsernameOrEmailOrPhone(),
@@ -93,7 +95,7 @@ public class AuthServiceImpl implements AuthService {
         // Nếu xác thực thành công, đặt vào SecurityContext
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // Lấy thông tin người dùng đã xác thực
+        // Lấy thông tin người dùng đã xác thực từ UserPrinciple
         UserPrinciple userPrinciple = (UserPrinciple) authentication.getPrincipal();
 
         // Tạo token JWT
@@ -101,24 +103,19 @@ public class AuthServiceImpl implements AuthService {
 
         // Lấy danh sách vai trò
         List<String> roles = userPrinciple.getAuthorities().stream()
-                .map(item -> item.getAuthority())
+                .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList());
 
-        // Trả về JwtResponse
+        // Trả về JwtResponse đã được cập nhật với đầy đủ thông tin
         return new JwtResponse(
                 jwt,
                 userPrinciple.getId(),
-                userPrinciple.getUsername(),
-                userPrinciple.getEmail(), // Cần lấy email từ UserPrinciple (cần thêm vào)
                 roles
         );
     }
 
     @Override
     public JwtResponse loginWithOAuth(OAuthLoginRequest request) {
-        // Logic cho đăng nhập OAuth2 sẽ được triển khai ở đây.
-        // Cần kiểm tra OauthAccountRepository, nếu chưa có thì tạo user mới hoặc liên kết.
-        // Hiện tại trả về null để hoàn thiện sau.
         throw new UnsupportedOperationException("Chức năng đăng nhập OAuth2 chưa được triển khai.");
     }
 }

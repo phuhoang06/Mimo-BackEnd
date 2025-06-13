@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 /**
  * Lớp này đại diện cho người dùng đã xác thực trong hệ thống bảo mật của Spring Security.
  * Cài đặt giao diện UserDetails giúp Spring biết cách xác thực và phân quyền.
+ *
+ * Phiên bản này đã được cập nhật để bao gồm cả số điện thoại (phone).
  */
 public class UserPrinciple implements UserDetails {
 
@@ -20,18 +22,32 @@ public class UserPrinciple implements UserDetails {
     private static final long serialVersionUID = 1L;
 
     private final UUID id; // ID người dùng
-    private final String username; // Tên đăng nhập
+    private final String username; // Tên đăng nhập (sử dụng cho việc xác thực)
     private final String password; // Mật khẩu đã được hash
+    private final String email;    // Email người dùng
+    private final String phoneNumber;    // Số điện thoại người dùng
     private final Collection<? extends GrantedAuthority> authorities; // Danh sách quyền (ROLE_XXX)
     private final boolean isLocked; // Trạng thái bị khóa hay không
 
-    // Constructor đầy đủ các thuộc tính
-    public UserPrinciple(UUID id, String username, String password,
+    /**
+     * Constructor đầy đủ các thuộc tính.
+     *
+     * @param id          ID của người dùng.
+     * @param username    Tên đăng nhập.
+     * @param password    Mật khẩu đã hash.
+     * @param email       Email.
+     * @param phoneNumber       Số điện thoại.
+     * @param authorities Các quyền của người dùng.
+     * @param isLocked    Trạng thái tài khoản có bị khóa không.
+     */
+    public UserPrinciple(UUID id, String username, String password, String email, String phoneNumber,
                          Collection<? extends GrantedAuthority> authorities,
                          boolean isLocked) {
         this.id = id;
         this.username = username;
         this.password = password;
+        this.email = email;
+        this.phoneNumber = phoneNumber;
         this.authorities = authorities;
         this.isLocked = isLocked;
     }
@@ -57,65 +73,72 @@ public class UserPrinciple implements UserDetails {
         // Tạo UserPrinciple từ các thông tin trong entity User
         return new UserPrinciple(
                 user.getId(),
-                user.getUsername(),
-                user.getPasswordHash(),
+                user.getUsername(),      // Tên đăng nhập
+                user.getPasswordHash(),  // Mật khẩu đã hash
+                user.getEmail(),         // Email
+                user.getPhoneNumber(),         // Số điện thoại (giả định User entity có phương thức getPhone())
                 authorities,
                 Boolean.TRUE.equals(user.getIsLocked())
         );
     }
 
-    // Getter cho ID
+    // --- Getters ---
+
     public UUID getId() {
         return id;
     }
 
-    // Getter cho danh sách quyền (dùng trong Spring Security để phân quyền)
+    public String getEmail() {
+        return email;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    // --- UserDetails interface methods ---
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return authorities;
     }
 
-    // Getter cho mật khẩu
     @Override
     public String getPassword() {
         return password;
     }
 
-    // Getter cho username
     @Override
     public String getUsername() {
         return username;
     }
 
-    // Mặc định không xử lý ngày hết hạn tài khoản => luôn trả về true
     @Override
     public boolean isAccountNonExpired() {
-        return true;
+        return true; // Mặc định không xử lý ngày hết hạn tài khoản
     }
 
-    // Nếu tài khoản KHÔNG bị khóa thì trả về true
     @Override
     public boolean isAccountNonLocked() {
-        return !isLocked;
+        return !isLocked; // Tài khoản không bị khóa
     }
 
-    // Mặc định không xử lý hết hạn mật khẩu => luôn trả về true
     @Override
     public boolean isCredentialsNonExpired() {
-        return true;
+        return true; // Mặc định không xử lý hết hạn mật khẩu
     }
 
-    // Mặc định tài khoản luôn được kích hoạt => true
     @Override
     public boolean isEnabled() {
-        return true;
+        return true; // Mặc định tài khoản luôn được kích hoạt
     }
 
-    // So sánh 2 UserPrinciple theo ID
+    // --- equals() and hashCode() ---
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof UserPrinciple)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
         UserPrinciple that = (UserPrinciple) o;
         return Objects.equals(id, that.id);
     }

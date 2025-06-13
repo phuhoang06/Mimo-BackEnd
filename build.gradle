@@ -49,6 +49,9 @@ dependencies {
     // Hibernate Envers for auditing
     implementation 'org.hibernate:hibernate-envers:6.6.1.Final'
 
+    //Fly way for database migrations
+    implementation 'org.flywaydb:flyway-mysql'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

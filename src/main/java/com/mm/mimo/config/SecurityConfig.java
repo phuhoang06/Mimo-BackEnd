@@ -17,29 +17,29 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
 @EnableWebSecurity
 @Configuration
-@EnableMethodSecurity
+@EnableMethodSecurity // Bật tính năng bảo mật ở cấp độ phương thức
 public class SecurityConfig {
 
-    private final IUserService userService;
+    // Thay đổi từ IUserService thành UserDetailsService để rõ ràng và đúng chuẩn Spring Security hơn
+    private final UserDetailsService userDetailsService;
     private final CorsConfigurationSource corsConfigurationSource;
     private final JwtUtil jwtUtil;
 
     @Autowired
-    public SecurityConfig(@Lazy IUserService userService,
+    public SecurityConfig(@Lazy UserDetailsService userDetailsService,
                           CorsConfigurationSource corsConfigurationSource,
                           JwtUtil jwtUtil) {
-        this.userService = userService;
+        this.userDetailsService = userDetailsService;
         this.corsConfigurationSource = corsConfigurationSource;
         this.jwtUtil = jwtUtil;
     }
@@ -62,7 +62,8 @@ public class SecurityConfig {
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
-        authenticationProvider.setUserDetailsService(userService);
+        // userDetailsService của bạn được inject từ constructor
+        authenticationProvider.setUserDetailsService(userDetailsService);
         authenticationProvider.setPasswordEncoder(passwordEncoder());
         return authenticationProvider;
     }
@@ -71,9 +72,9 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtAuthenticationTokenFilter jwtAuthenticationTokenFilter) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable)
-                .cors(corsCustomizer -> corsCustomizer.configurationSource(this.corsConfigurationSource))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(AbstractHttpConfigurer::disable) // Tắt CSRF vì dùng JWT
+                .cors(corsCustomizer -> corsCustomizer.configurationSource(this.corsConfigurationSource)) // Cấu hình CORS
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Không sử dụng session
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationTokenFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
@@ -81,6 +82,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Cho phép truy cập các API đăng nhập, đăng ký công khai
                         .requestMatchers("/api/auth/**").permitAll()
+                        // *** THÊM DÒNG QUAN TRỌNG NÀY ***
+                        // Bất kỳ request nào khác đều yêu cầu phải được xác thực
+                        .anyRequest().authenticated()
                 );
         return http.build();
     }
